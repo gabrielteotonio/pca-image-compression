@@ -2,6 +2,8 @@
 library(EMD) # Lena's image
 library(blockmatrix) # For creating block matrices
 library(ggplot2) # Graphics
+library(redR) # For MSE and PSNR measures
+library(SPUTNIK) # For SSIM measure
 
 # Loading data 
 data(lena) # Storage the image
@@ -49,7 +51,7 @@ pca <- function(data) {
   eigen_pairs <- eigen(cov_matrix) # Calculating eigenvalues and eigenvectors
   eigenvalues <- eigen_pairs$values # Accessing eigenvalues
   eigenvectors <- eigen_pairs$vectors # Accessing eigenvectors
-
+  
   results <- list("x" = x, "eigenvalues" = eigenvalues, "eigenvectors" = eigenvectors)
   return(results)
 }
@@ -66,7 +68,7 @@ compression <- function(x, eigenvectors, m) {
 
 # Compression ----
 PCA <- pca(lena)
-compression(PCA$x, PCA$eigenvectors, 5) # See the image with m PC
+image <- compression(PCA$x, PCA$eigenvectors, 2) # See the image with m PC
 
 # Graphics ----
 
@@ -76,10 +78,10 @@ prop_var <- as.data.frame(pca_prop_var[1:8])
 colnames(prop_var) = "prop_var"
 
 p <- ggplot(prop_var, aes(x=c(1:8), y=prop_var)) + 
-      geom_bar(stat="identity", fill="#494d4d") + 
-      labs(title="", x="Principal Component", 
-           y="% of Variance") + geom_line() + geom_point() + 
-      scale_x_continuous(breaks=c(1:8))
+  geom_bar(stat="identity", fill="#494d4d") + 
+  labs(title="", x="Principal Component", 
+       y="% of Variance") + geom_line() + geom_point() + 
+  scale_x_continuous(breaks=c(1:8))
 p
 
 # Matrices of the eigenvectors
@@ -95,54 +97,54 @@ image(matrix(PCA$eigenvectors[, 60], 8, 8, byrow = T), col=gray(0:100/100), axes
 image(matrix(PCA$eigenvectors[, 64], 8, 8, byrow = T), col=gray(0:100/100), axes=FALSE)
 
 # Lena's plots
-compression(PCA$x, PCA$eigenvectors, 1) 
-compression(PCA$x, PCA$eigenvectors, 3) 
-compression(PCA$x, PCA$eigenvectors, 7) 
-compression(PCA$x, PCA$eigenvectors, 10) 
-compression(PCA$x, PCA$eigenvectors, 13) 
-image(lena, col=gray(0:100/100), axes=FALSE) # See the image
+lena_1 <- compression(PCA$x, PCA$eigenvectors, 1) 
+lena_3 <- compression(PCA$x, PCA$eigenvectors, 3) 
+lena_7 <- compression(PCA$x, PCA$eigenvectors, 7) 
+lena_10 <- compression(PCA$x, PCA$eigenvectors, 10) 
+lena_13 <- compression(PCA$x, PCA$eigenvectors, 13) 
+
+image(lena_1, col=gray(0:100/100), axes=FALSE) # See the image compression for 1 PC
+image(lena_3, col=gray(0:100/100), axes=FALSE) # See the image compression for 3 PC
+image(lena_7, col=gray(0:100/100), axes=FALSE) # See the image compression for 7 PC
+image(lena_10, col=gray(0:100/100), axes=FALSE) # See the image compression for 10 PC
+image(lena_13, col=gray(0:100/100), axes=FALSE) # See the image compression for 13 PC
+image(lena, col=gray(0:100/100), axes=FALSE) # See the original image
 
 # Quality of reconstruction ----
-psnr <- function(lena, x, eigenvectors, m) {
-  y <- x %*% eigenvectors # Creating the new "dataframe" with new p principal components 
-  t_m <- Tmatrix(m) # T matrix for define the number of p taking into account
-  y_m <- y %*% t_m # Creating the new "dataframe" with new p = dim(t_m) principal components
-  
-  b <- y_m %*% t(eigenvectors) # Inverse of the transformation
-  B <- obsToBlock(b) # The image generating matrix
-  original <- as.vector(lena[1:262144])
-  compressed <- as.vector(B[1:262144])
-  
-  # mse <- mean((original - compressed)^2)
-  # psnr <- 10 * log10((2^8 - 1)^2/mse)
-  psnr <- PSNR(original, compressed)
-  return(psnr)
+# PSNR
+psnr_lena_1 <- PSNR(lena, lena_1)
+psnr_lena_3 <- PSNR(lena, lena_3)
+psnr_lena_7 <- PSNR(lena, lena_7)
+psnr_lena_10 <- PSNR(lena, lena_10)
+psnr_lena_13 <- PSNR(lena, lena_13)
+
+#SSIM
+ssim <- c()
+for (i in 1:64){
+  ssim[i] <- SSIM(lena, compression(PCA$x, PCA$eigenvectors, i)) 
 }
 
-psnr(lena, PCA$x, PCA$eigenvectors, 50)
+ssim_lena_1 <- ssim[1]
+ssim_lena_3 <- ssim[3]
+ssim_lena_7 <- ssim[7]
+ssim_lena_10 <- ssim[10]
+ssim_lena_13 <- ssim[13]
 
-plot(PCA$eigenvectors[,1], type = "n")
-lines(PCA$eigenvectors[,1], type = "l")
+q <- ggplot(data=as.data.frame(ssim), aes(x=1:64, y=ssim, group=1)) +
+     geom_line()
 
-ggplot(data=as.data.frame(PCA$eigenvectors[,1]), aes(x=1:64, y=PCA$eigenvectors[,1], group=1)) +
-  geom_line()
 
-ggplot(data=as.data.frame(PCA$eigenvectors[,3]), aes(x=1:64, y=PCA$eigenvectors[,3], group=1)) +
-  geom_line()
-
-ssim <- function(lena, x, eigenvectors, m) {
-  y <- x %*% eigenvectors # Creating the new "dataframe" with new p principal components 
-  t_m <- Tmatrix(m) # T matrix for define the number of p taking into account
-  y_m <- y %*% t_m # Creating the new "dataframe" with new p = dim(t_m) principal components
-  
-  b <- y_m %*% t(eigenvectors) # Inverse of the transformation
-  B <- obsToBlock(b) # The image generating matrix
-  original <- as.vector(lena[1:262144])
-  compressed <- as.vector(B[1:262144])
-  
-  # mse <- mean((original - compressed)^2)
-  # psnr <- 10 * log10((2^8 - 1)^2/mse)
-  ssim <- SSIM(original, compressed)
-  return(ssim)
+# MSE
+mse <- c()
+for (i in 1:64){
+  mse[i] <- MSE(lena, compression(PCA$x, PCA$eigenvectors, i)) 
 }
-ssim(lena, PCA$x, PCA$eigenvectors, 5)
+
+mse_lena_1 <- mse[1]
+mse_lena_3 <- mse[3]
+mse_lena_7 <- mse[7]
+mse_lena_10 <- mse[10]
+mse_lena_13 <- mse[13]
+
+r <- ggplot(data=as.data.frame(mse), aes(x=1:64, y=mse, group=1)) +
+  geom_line()
