@@ -5,7 +5,7 @@ library(ggplot2) # Graphics
 library(redR) # For MSE and PSNR measures
 library(SPUTNIK) # For SSIM measure
 
-# Loading data 
+# Loading data ----
 data(lena) # Storage the image
 image(lena, col=gray(0:100/100), axes=FALSE) # See the image
 
